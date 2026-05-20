@@ -41,11 +41,11 @@ impl Plugin for GainPlugin {
         self.parameters.process_event(event);
     }
 
-    fn create_processor(&mut self, _config: ProcessorConfig) -> Self::Processor {
+    fn create_processor(&self, _config: ProcessorConfig) -> Self::Processor {
         GainPluginProcessor::new((*self.parameters).clone())
     }
 
-    fn create_editor(&mut self, host: Rc<dyn Host>) -> Self::Editor {
+    fn create_editor(&self, host: Rc<dyn Host>) -> Self::Editor {
         GainPluginEditor::new(host, self.parameters.clone(), self.editor_settings.clone())
     }
 

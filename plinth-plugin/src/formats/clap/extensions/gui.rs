@@ -95,7 +95,7 @@ impl<P: ClapPlugin> Gui<P> {
                 instance.parameter_event_map.clone(),
             ));
 
-            instance.editor = Some(instance.plugin.as_mut().unwrap().create_editor(host));
+            instance.editor = Some(instance.plugin.as_ref().unwrap().create_editor(host));
 
             #[cfg(target_os="linux")]
             if !instance.host_ext_timer_support.is_null() {
@@ -144,7 +144,7 @@ impl<P: ClapPlugin> Gui<P> {
             };
 
             let editor_size = editor.window_size();
-            
+
             unsafe {
                 (*width) = editor_size.0 as u32;
                 (*height) = editor_size.1 as u32;
@@ -167,7 +167,7 @@ impl<P: ClapPlugin> Gui<P> {
             editor.can_resize()
         })
     }
-    
+
     unsafe extern "C" fn get_resize_hints(_plugin: *const clap_plugin, _hints: *mut clap_gui_resize_hints) -> bool {
         log::trace!("gui::get_resize_hints");
 
@@ -189,7 +189,7 @@ impl<P: ClapPlugin> Gui<P> {
 
             unsafe {
                 *width = new_size.0 as _;
-                *height = new_size.1 as _;    
+                *height = new_size.1 as _;
             }
 
             true
@@ -239,7 +239,7 @@ impl<P: ClapPlugin> Gui<P> {
 
         false
     }
-    
+
     unsafe extern "C" fn suggest_title(_plugin: *const clap_plugin, _title: *const c_char) {
         log::trace!("gui::suggest_title");
     }

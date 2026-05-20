@@ -95,11 +95,11 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
 
     pub fn with_wrapper<T>(wrapper: *mut c_void, mut f: impl FnMut(&mut Self) -> T) -> T {
         assert!(!wrapper.is_null());
-    
+
         let mut wrapper = unsafe { Box::from_raw(wrapper as *mut Self) };
         let result = f(wrapper.as_mut());
         Box::leak(wrapper);
-    
+
         result
     }
 
@@ -113,7 +113,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
 
         self.sample_rate.store(sample_rate, Ordering::Release);
 
-        let mut plugin = self.plugin.lock().unwrap();
+        let plugin = self.plugin.lock().unwrap();
         self.processor = Some(plugin.create_processor(processor_config));
     }
 
@@ -193,7 +193,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// `string` must be a valid pointer to string with at least PLINTH_AUV3_MAX_STRING_LENGTH characters
     pub unsafe fn normalized_parameter_to_string(&self, address: u64, value: f32, string: *mut c_char) {
         let plugin = self.plugin.lock().unwrap();
@@ -231,7 +231,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// `context` must be a pointer that can be passed to `read`
     pub unsafe fn load_state(
         &mut self,
@@ -259,7 +259,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// `context` must be a pointer that can be passed to `write`
     pub unsafe fn save_state(
         &self,
@@ -272,7 +272,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// `context` must be a pointer that can be passed to the callbacks
     pub unsafe fn create_editor(
         &mut self,
@@ -293,12 +293,12 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
             self.parameter_index_from_id.clone(),
         );
 
-        let mut plugin = self.plugin.lock().unwrap();
+        let plugin = self.plugin.lock().unwrap();
         self.editor = Some(plugin.create_editor(Rc::new(host)));
     }
 
     /// # Safety
-    /// 
+    ///
     /// `parent` must be a valid pointer to a parent NSView
     pub unsafe fn open_editor(&mut self, parent: *mut c_void) {
         let raw_window_handle = AppKitWindowHandle::new(
@@ -332,7 +332,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// All pointers must be valid
     /// `input`, `aux` and `output` must point to arrays with at least `channels` elements
     /// Each array must have at least `frames` elements
@@ -393,7 +393,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
                 use ::plinth_core::signals::signal::SignalMut;
                 output.copy_from_signal(input);
             }
-            
+
             let state = processor.process(
                 output,
                 aux.as_ref(),
