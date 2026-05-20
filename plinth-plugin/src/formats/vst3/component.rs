@@ -19,10 +19,9 @@ use widestring::U16CStr;
 use crate::formats::PluginFormat;
 use crate::host::HostInfo;
 use crate::vst3::parameters::parameter_change_to_event;
-use crate::{ParameterId, Parameters, ProcessMode, ProcessState, Processor};
+use crate::{ParameterId, Parameters, ProcessMode, ProcessState, Processor, ProcessorConfig};
 use crate::editor::NoEditor;
 use crate::parameters::{group::{self, ParameterGroupRef}, has_duplicates, info::ParameterInfo};
-use crate::processor::ProcessorConfig;
 use crate::string::{char16_to_string, copy_str_to_char16};
 use crate::vst3::{event::EventIterator, parameters::ParameterChangeIterator};
 
@@ -53,9 +52,10 @@ pub struct PluginComponent<P: Vst3Plugin> {
     parameter_groups: RefCell<Vec<ParameterGroupRef>>,
     pitch_bend_parameter_ids: RefCell<[ParameterId; 16]>,
 
-    processor_config: RefCell<ProcessorConfig>,
+    process_mode: RefCell<ProcessMode>,
     processing: AtomicBool,
     tail_length: AtomicU32,
+    latency: AtomicU32,
     component_handler: Rc<RefCell<Option<ComPtr<IComponentHandler>>>>,
 
     audio_thread_state: AudioThreadState<P>,
@@ -70,9 +70,11 @@ impl<P: Vst3Plugin + 'static> PluginComponent<P> {
             parameter_groups: Default::default(),
             pitch_bend_parameter_ids: Default::default(),
 
-            processor_config: Default::default(),
+            process_mode: ProcessMode::default().into(),
             processing: AtomicBool::new(false),
             tail_length: AtomicU32::new(0),
+            latency: AtomicU32::new(0),
+
             component_handler: Default::default(),
 
             audio_thread_state: Default::default(),
@@ -234,8 +236,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
 
     unsafe fn getLatencySamples(&self) -> uint32 {
         log::trace!("IAudioProcessor::getLatencySamples");
-        let plugin = self.plugin.borrow();
-        plugin.as_ref().map(|plugin| plugin.latency() as _).unwrap_or_default()
+        self.latency.load(Ordering::Acquire)
     }
 
     unsafe fn setupProcessing(&self, setup: *mut ProcessSetup) -> tresult {
@@ -244,9 +245,23 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
         let setup = unsafe { &*setup };
         assert!(setup.maxSamplesPerBlock > 0);
 
-        let mut processor_config = self.processor_config.borrow_mut();
-        processor_config.sample_rate = setup.sampleRate;
-        processor_config.max_block_size = setup.maxSamplesPerBlock as usize;
+        let processor_config = ProcessorConfig {
+            sample_rate: setup.sampleRate,
+            min_block_size: 0,
+            max_block_size: setup.maxSamplesPerBlock as _,
+            process_mode: *self.process_mode.borrow(),
+        };
+
+        let plugin = self.plugin.borrow();
+        let Some(plugin) = plugin.as_ref() else {
+            return kResultFalse;
+        };
+
+        let mut processor = self.audio_thread_state.processor.borrow_mut();
+        *processor = Some(plugin.create_processor(processor_config));
+
+        // Cache latency since it's not allowed to change during processing
+        self.latency.store(plugin.latency(), Ordering::Release);
 
         kResultOk
     }
@@ -362,7 +377,7 @@ impl<P: Vst3Plugin> IComponentTrait for PluginComponent<P> {
             }
         };
 
-        self.processor_config.borrow_mut().process_mode = mode;
+        *self.process_mode.borrow_mut() = mode;
 
         kResultOk
     }
@@ -434,23 +449,8 @@ impl<P: Vst3Plugin> IComponentTrait for PluginComponent<P> {
         kResultOk
     }
 
-    unsafe fn setActive(&self, state: TBool) -> tresult {
-        log::trace!("IComponent::setActive: {state}");
-
-        let mut plugin = self.plugin.borrow_mut();
-        let Some(plugin) = plugin.as_mut() else {
-            return kResultFalse;
-        };
-
-        let active = state > 0;
-        let mut processor = self.audio_thread_state.processor.borrow_mut();
-
-        if active {
-            *processor = Some(plugin.create_processor(self.processor_config.borrow().clone()));
-        } else {
-            *processor = None;
-        }
-
+    unsafe fn setActive(&self, _state: TBool) -> tresult {
+        log::trace!("IComponent::setActive: {_state}");
         kResultOk
     }
 
@@ -606,6 +606,8 @@ impl<P: Vst3Plugin + 'static> IEditControllerTrait for PluginComponent<P> {
     }
 
     unsafe fn getParamNormalized(&self, id: ParamID) -> ParamValue {
+        log::trace!("IEditController::getParamNormalized");
+
         let plugin = self.plugin.borrow();
         let Some(plugin) = plugin.as_ref() else {
             return 0.0;
@@ -621,6 +623,8 @@ impl<P: Vst3Plugin + 'static> IEditControllerTrait for PluginComponent<P> {
     }
 
     unsafe fn setParamNormalized(&self, id: ParamID, value: ParamValue) -> tresult {
+        log::trace!("IEditController::setParamNormalized");
+
         let mut plugin = self.plugin.borrow_mut();
         let Some(plugin) = plugin.as_mut() else {
             return kResultFalse;
