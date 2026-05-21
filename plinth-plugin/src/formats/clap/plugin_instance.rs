@@ -275,14 +275,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
             return CLAP_PROCESS_ERROR;
         }
 
-        // TODO: Support other bus layouts
-        if P::HAS_AUX_INPUT {
-            assert_eq!(process.audio_inputs_count, 2);
-        } else {
-            assert_eq!(process.audio_inputs_count, 1);
-        }
-
-        assert_eq!(process.audio_outputs_count, 1);
+        assert!(process.audio_outputs_count >= 1);
 
         let input_buffers = unsafe { std::slice::from_raw_parts(process.audio_inputs, process.audio_inputs_count as usize) };
         let output_buffers = unsafe { std::slice::from_raw_parts(process.audio_outputs, process.audio_outputs_count as usize) };
@@ -296,7 +289,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
         let input = unsafe { PtrSignal::from_pointers(input_buffer.channel_count as usize, process.frames_count as usize, input_buffer.data32 as _) };
         let mut output = unsafe { PtrSignalMut::from_pointers(output_buffer.channel_count as usize, process.frames_count as usize, output_buffer.data32) };
 
-        let aux = if P::HAS_AUX_INPUT {
+        let aux = if P::HAS_AUX_INPUT && process.audio_inputs_count >= 2 {
             let aux_buffer = input_buffers[1];
             assert_eq!(aux_buffer.channel_count, 2);
 
