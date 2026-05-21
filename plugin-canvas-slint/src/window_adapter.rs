@@ -10,6 +10,8 @@ use cursor_icon::CursorIcon;
 use i_slint_core::{window::{WindowAdapter, WindowAdapterInternal}, renderer::Renderer, platform::{PlatformError, WindowEvent}};
 use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext};
 use keyboard_types::Code;
+#[cfg(target_os="macos")]
+use plugin_canvas::is_macos_version_at_least;
 use plugin_canvas::keyboard::KeyboardModifiers;
 use plugin_canvas::{event::EventResponse, LogicalSize};
 use portable_atomic::AtomicF64;
@@ -60,10 +62,18 @@ impl PluginCanvasWindowAdapter {
 
         let skia_context = SkiaSharedContext::default();
 
+        #[cfg(target_os="linux")]
+        let renderer = SkiaRenderer::default(&skia_context);
+
+        #[cfg(target_os="macos")]
+        let renderer = if is_macos_version_at_least(13, 0, 0) {
+            SkiaRenderer::default_metal(&skia_context)
+        } else {
+            SkiaRenderer::default_opengl(&skia_context)
+        };
+
         #[cfg(target_os="windows")]
         let renderer = SkiaRenderer::default_direct3d(&skia_context);
-        #[cfg(not(target_os="windows"))]
-        let renderer = SkiaRenderer::default(&skia_context);
 
         renderer.set_window_handle(plugin_canvas_window.clone(), plugin_canvas_window.clone(), slint_size, None)?;
 

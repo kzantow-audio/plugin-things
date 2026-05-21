@@ -10,4 +10,7 @@ pub use dimensions::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSiz
 pub use event::{Event, MouseButton};
 pub use window::Window;
 
+#[cfg(target_os="macos")]
+pub use platform::mac::is_macos_version_at_least;
+
 mod platform;
