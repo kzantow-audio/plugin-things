@@ -9,7 +9,7 @@ use objc2_foundation::{MainThreadMarker, NSArray, NSDefaultRunLoopMode, NSPoint,
 use objc2_quartz_core::CADisplayLink;
 use raw_window_handle::{AppKitWindowHandle, HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 
-use crate::{Event, LogicalPosition, platform::{mac::is_os_version_at_least, os_window_handle::OsWindowHandle}, thread_bound::ThreadBound};
+use crate::{Event, LogicalPosition, platform::{mac::is_macos_version_at_least, os_window_handle::OsWindowHandle}, thread_bound::ThreadBound};
 use crate::error::Error;
 use crate::event::{EventCallback, EventResponse};
 use crate::platform::interface::OsWindowInterface;
@@ -61,7 +61,7 @@ impl OsWindowInterface for OsWindow {
         let (view, window_handle) = unsafe {
             let view: Allocated<OsWindowView> = msg_send![view_class, alloc];
             let view: Retained<OsWindowView> = msg_send![view, initWithFrame: view_rect];
-        
+
             let tracking_area = NSTrackingArea::initWithRect_options_owner_userInfo(
                 NSTrackingArea::alloc(),
                 view_rect,
@@ -74,7 +74,7 @@ impl OsWindowInterface for OsWindow {
             );
             view.addTrackingArea(&tracking_area);
 
-            let dragged_types = if is_os_version_at_least(10, 13, 0) {
+            let dragged_types = if is_macos_version_at_least(10, 13, 0) {
                 NSArray::arrayWithObject(NSPasteboardTypeFileURL)
             } else {
                 NSArray::new()
@@ -83,11 +83,11 @@ impl OsWindowInterface for OsWindow {
 
             let parent_view: &mut NSView = &mut *(parent_window_handle.ns_view.as_ptr() as *mut NSView);
             parent_view.addSubview(&view);
-    
+
             let window_handle = AppKitWindowHandle::new(
                 NonNull::new(view.as_ref() as *const NSView as _).unwrap()
             );
-    
+
             (view, window_handle)
         };
 
@@ -106,7 +106,7 @@ impl OsWindowInterface for OsWindow {
 
         let window = Arc::new(ThreadBound::new(window));
 
-        if is_os_version_at_least(14, 0, 0) {
+        if is_macos_version_at_least(14, 0, 0) {
             let display_link = unsafe {
                 let display_link = view.displayLinkWithTarget_selector(&view, sel!(onDisplayLinkNotify:));
                 display_link.addToRunLoop_forMode(&NSRunLoop::mainRunLoop(), NSDefaultRunLoopMode);
@@ -120,7 +120,7 @@ impl OsWindowInterface for OsWindow {
                 NSRunLoop::mainRunLoop().addTimer_forMode(timer.as_ref(), NSDefaultRunLoopMode);
                 timer
             };
-            
+
             *window.timer.borrow_mut() = Some(timer);
         }
 
@@ -165,79 +165,79 @@ impl OsWindowInterface for OsWindow {
                 CursorIcon::NotAllowed => NSCursor::operationNotAllowedCursor(),
                 CursorIcon::Grab => NSCursor::openHandCursor(),
                 CursorIcon::Grabbing => NSCursor::closedHandCursor(),
-                CursorIcon::EResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::EResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::columnResizeCursorInDirections(NSHorizontalDirections::Right)
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeRightCursor()
                 }
-                CursorIcon::NResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::NResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::rowResizeCursorInDirections(NSVerticalDirections::Up)
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeUpCursor()
                 }
-                CursorIcon::NeResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::NeResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::TopRight, NSCursorFrameResizeDirections::Outward)
                 } else {
                     NSCursor::arrowCursor()
                 }
-                CursorIcon::NwResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::NwResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::TopLeft, NSCursorFrameResizeDirections::Outward)
                 } else {
                     NSCursor::arrowCursor()
                 }
-                CursorIcon::SResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::SResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::TopLeft, NSCursorFrameResizeDirections::Outward)
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeDownCursor()
                 }
-                CursorIcon::SeResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::SeResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::BottomRight, NSCursorFrameResizeDirections::Outward)
                 } else {
                     NSCursor::arrowCursor()
                 }
-                CursorIcon::SwResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::SwResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::BottomLeft, NSCursorFrameResizeDirections::Outward)
                 } else {
                     NSCursor::arrowCursor()
                 }
-                CursorIcon::WResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::WResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::columnResizeCursorInDirections(NSHorizontalDirections::Left)
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeLeftCursor()
                 }
-                CursorIcon::EwResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::EwResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::columnResizeCursor()
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeLeftRightCursor()
                 }
-                CursorIcon::NsResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::NsResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::rowResizeCursor()
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeUpDownCursor()
                 }
-                CursorIcon::NeswResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::NeswResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::TopRight, NSCursorFrameResizeDirections::All)
                 } else {
                     NSCursor::arrowCursor()
                 }
-                CursorIcon::NwseResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::NwseResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::frameResizeCursorFromPosition_inDirections(NSCursorFrameResizePosition::TopLeft, NSCursorFrameResizeDirections::All)
                 } else {
                     NSCursor::arrowCursor()
                 }
-                CursorIcon::ColResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::ColResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::columnResizeCursor()
                 } else {
                     #[allow(deprecated)]
                     NSCursor::resizeLeftRightCursor()
                 }
-                CursorIcon::RowResize => if is_os_version_at_least(15, 0, 0) {
+                CursorIcon::RowResize => if is_macos_version_at_least(15, 0, 0) {
                     NSCursor::rowResizeCursor()
                 } else {
                     #[allow(deprecated)]
@@ -248,7 +248,7 @@ impl OsWindowInterface for OsWindow {
                 CursorIcon::ZoomOut => NSCursor::arrowCursor(), // TODO
                 _ => todo!(),
             };
-    
+
             cursor.set();
 
             if self.cursor_hidden.swap(false, Ordering::Relaxed) {
@@ -270,7 +270,7 @@ impl OsWindowInterface for OsWindow {
         let cg_point = CGPoint::new(screen_position.x, screen_height - screen_position.y);
         CGWarpMouseCursorPosition(cg_point);
     }
-    
+
     fn poll_events(&self) -> Result<(), Error> {
         Ok(())
     }
