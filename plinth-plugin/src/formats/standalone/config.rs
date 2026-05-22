@@ -96,7 +96,7 @@ impl AudioOutputConfig {
                     devices.push((id.clone(), id.to_string()));
                 }
                 (Err(err), _) => {
-                    log::warn!("Failed to query audio device id {err}")
+                    tracing::warn!("Failed to query audio device id {err}")
                 }
             }
         }
@@ -112,12 +112,12 @@ impl AudioOutputConfig {
         host: &mut cpal::Host,
     ) -> Result<cpal::Device, Box<dyn std::error::Error>> {
         if let Some(device_id) = &self.device_id {
-            log::info!("Opening CPAL output device '{}'...", device_id);
+            tracing::info!("Opening CPAL output device '{}'...", device_id);
             host.output_devices()?
                 .find(|d| d.id().ok().as_ref() == Some(device_id))
                 .ok_or_else(|| "Specified audio device not found".into())
         } else {
-            log::info!("Opening CPAL default output device...");
+            tracing::info!("Opening CPAL default output device...");
             host.default_output_device()
                 .ok_or_else(|| "No audio output device available".into())
         }
@@ -149,7 +149,7 @@ impl AudioOutputConfig {
         match best_match {
             Some(s) => Ok(s.with_sample_rate(target_rate)),
             None => {
-                log::warn!("No matching audio device config found, using device default");
+                tracing::warn!("No matching audio device config found, using device default");
                 Ok(device.default_output_config()?)
             }
         }

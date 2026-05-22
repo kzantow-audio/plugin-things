@@ -39,7 +39,7 @@ impl<P: StandalonePlugin> ApplicationHandler for StandaloneRunner<P> {
         let window = match event_loop.create_window(attrs) {
             Ok(w) => w,
             Err(e) => {
-                log::error!("failed to create window: {e}");
+                tracing::error!("failed to create window: {e}");
                 event_loop.exit();
                 return;
             }
@@ -220,7 +220,7 @@ pub fn run_standalone_with_config<P: StandalonePlugin + 'static>(
                 audio_state.process(data, channels);
             },
             |err| {
-                log::error!("An audio stream error occurred: {err}");
+                tracing::error!("An audio stream error occurred: {err}");
             },
             None,
         )?;

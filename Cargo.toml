@@ -19,11 +19,11 @@ plugin-canvas-slint = { path = "plugin-canvas-slint" }
 
 cursor-icon = "1"
 keyboard-types = "0.8"
-log = "0.4"
 num-traits = "0.2"
 portable-atomic = { version = "1", default-features = false, features = ["float", "serde"] }
 raw-window-handle = "0.6"
 slint = { version = "^1.16.1", default-features = false, features = ["accessibility", "compat-1-2", "std"] }
+tracing = "0.1"
 
 # Internal slint crate versions need to be pinned
 # since they don't maintain semver compatibility

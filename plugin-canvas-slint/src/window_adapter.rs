@@ -151,7 +151,7 @@ impl PluginCanvasWindowAdapter {
                 match self.plugin_canvas_window.poll_events() {
                     Ok(_) => {},
                     Err(e) => {
-                        log::error!("Error polling events: {e:?}");
+                        tracing::error!("Error polling events: {e:?}");
                     }
                 }
 

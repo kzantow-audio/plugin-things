@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, ffi::{CStr, c_char, c_void}, iter::zip, ptr::{n
 
 use atomic_refcell::AtomicRefCell;
 use clap_sys::{events::clap_input_events, ext::{audio_ports::CLAP_EXT_AUDIO_PORTS, gui::{clap_host_gui, CLAP_EXT_GUI}, latency::CLAP_EXT_LATENCY, note_ports::CLAP_EXT_NOTE_PORTS, params::{clap_host_params, CLAP_EXT_PARAMS}, render::CLAP_EXT_RENDER, state::{clap_host_state, CLAP_EXT_STATE}, tail::{clap_host_tail, CLAP_EXT_TAIL}, timer_support::{clap_host_timer_support, CLAP_EXT_TIMER_SUPPORT}}, host::clap_host, plugin::clap_plugin, process::{clap_process, clap_process_status, CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_ERROR, CLAP_PROCESS_TAIL}};
-use log::error;
+use tracing::error;
 use plinth_core::signals::{ptr_signal::{PtrSignal, PtrSignalMut}, signal::SignalMut};
 use raw_window_handle::RawWindowHandle;
 
@@ -184,7 +184,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
 
 
     unsafe extern "C" fn init(plugin: *const clap_plugin) -> bool {
-        log::trace!("plugin::init");
+        tracing::trace!("plugin::init");
 
         Self::with_plugin_instance(plugin, |instance| {
             // Grab host extensions
@@ -201,7 +201,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
     }
 
     unsafe extern "C" fn destroy(plugin: *const clap_plugin) {
-        log::trace!("plugin::destroy");
+        tracing::trace!("plugin::destroy");
 
         Self::with_plugin_instance(plugin, |instance| {
             instance.plugin = None;
@@ -215,7 +215,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
         max_frames_count: u32
     ) -> bool
     {
-        log::trace!("plugin::activate");
+        tracing::trace!("plugin::activate");
 
         Self::with_plugin_instance(plugin, |instance| {
             let config = ProcessorConfig {
@@ -237,7 +237,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
     }
 
     unsafe extern "C" fn deactivate(plugin: *const clap_plugin) {
-        log::trace!("plugin::deactivate");
+        tracing::trace!("plugin::deactivate");
 
         Self::with_plugin_instance(plugin, |instance| {
             *instance.audio_thread_state.processor.borrow_mut() = None;
@@ -246,17 +246,17 @@ impl<P: ClapPlugin> PluginInstance<P> {
     }
 
     unsafe extern "C" fn start_processing(_plugin: *const clap_plugin) -> bool {
-        log::trace!("plugin::start_processing");
+        tracing::trace!("plugin::start_processing");
 
         true
     }
 
     unsafe extern "C" fn stop_processing(_plugin: *const clap_plugin) {
-        log::trace!("plugin::stop_processing");
+        tracing::trace!("plugin::stop_processing");
     }
 
     unsafe extern "C" fn reset(plugin: *const clap_plugin) {
-        log::trace!("plugin::reset");
+        tracing::trace!("plugin::reset");
 
         Self::with_plugin_instance(plugin, |instance| {
             let mut processor = instance.audio_thread_state.processor.borrow_mut();
@@ -267,7 +267,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
     }
 
     unsafe extern "C" fn process(plugin: *const clap_plugin, process: *const clap_process) -> clap_process_status {
-        log::trace!("plugin::process");
+        tracing::trace!("plugin::process");
 
         let process = unsafe { &*process };
 
@@ -353,7 +353,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
     }
 
     unsafe extern "C" fn get_extension(_plugin: *const clap_plugin, id: *const c_char) -> *const c_void {
-        log::trace!("plugin::get_extension");
+        tracing::trace!("plugin::get_extension");
 
         let id = unsafe { CStr::from_ptr(id) };
 
@@ -381,7 +381,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
     }
 
     unsafe extern "C" fn on_main_thread(plugin: *const clap_plugin) {
-        log::trace!("plugin::on_main_thread");
+        tracing::trace!("plugin::on_main_thread");
 
         Self::with_plugin_instance(plugin, |instance| {
             instance.process_events_to_plugin();

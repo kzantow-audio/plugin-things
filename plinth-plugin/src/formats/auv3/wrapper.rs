@@ -402,7 +402,7 @@ impl<P: Auv3Plugin> Auv3Wrapper<P> {
 
                 let tail_length_samples = match state {
                     ProcessState::Error => {
-                        log::error!("Processing error");
+                        tracing::error!("Processing error");
                         0
                     },
 

@@ -12,7 +12,7 @@ pub fn connect_inputs(
     let midi_in = match MidiInput::new("plinth-standalone") {
         Ok(m) => m,
         Err(err) => {
-            log::warn!("Failed to create MIDI input: {err}");
+            tracing::warn!("Failed to create MIDI input: {err}");
             return vec![];
         }
     };
@@ -20,7 +20,7 @@ pub fn connect_inputs(
     let ports = midi_in.ports();
 
     if ports.is_empty() {
-        log::info!("No MIDI input ports available");
+        tracing::info!("No MIDI input ports available");
     }
 
     let mut connections = Vec::with_capacity(ports.len());
@@ -35,7 +35,7 @@ pub fn connect_inputs(
         let midi_in = match MidiInput::new("plinth-standalone") {
             Ok(m) => m,
             Err(e) => {
-                log::warn!("Failed to create MIDI input for port '{port_name}': {e}");
+                tracing::warn!("Failed to create MIDI input for port '{port_name}': {e}");
                 continue;
             }
         };
@@ -52,10 +52,10 @@ pub fn connect_inputs(
             (),
         ) {
             Ok(connection) => {
-                log::info!("Connected MIDI input port '{port_name}'");
+                tracing::info!("Connected MIDI input port '{port_name}'");
                 connections.push(connection);
             }
-            Err(err) => log::warn!("Failed to connect MIDI input port '{port_name}': {err}"),
+            Err(err) => tracing::warn!("Failed to connect MIDI input port '{port_name}': {err}"),
         }
     }
 

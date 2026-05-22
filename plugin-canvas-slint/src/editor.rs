@@ -31,7 +31,7 @@ impl SlintEditor {
 
                 Box::new(move |event| {
                     if std::thread::current().id() != editor_thread {
-                        log::warn!("Tried to call event callback from non-editor thread");
+                        tracing::warn!("Tried to call event callback from non-editor thread");
                         return EventResponse::Ignored;
                     }
 

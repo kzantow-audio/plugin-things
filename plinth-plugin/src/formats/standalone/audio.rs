@@ -17,7 +17,7 @@ impl EventListPush for Vec<Event> {
     type EventType = Event;
     fn push_event(&mut self, event: Event) {
         if self.len() == self.capacity() {
-            log::warn!(
+            tracing::warn!(
                 "Event queue exceeded preallocated capacity of {} - allocating more. \
                 Increase EVENT_QUEUE_LEN to avoid allocation on the audio thread.",
                 self.capacity()
