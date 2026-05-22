@@ -46,23 +46,27 @@ impl OsWindow {
     }
 
     fn button_down(&self, button: MouseButton, position: LogicalPosition) {
-        let mut buttons_down = self.buttons_down.borrow_mut();
-        if buttons_down.is_empty() {
-            unsafe { SetCapture(self.hwnd()); }
-        }
+        {
+            let mut buttons_down = self.buttons_down.borrow_mut();
+            if buttons_down.is_empty() {
+                unsafe { SetCapture(self.hwnd()); }
+            }
 
-        buttons_down.insert(button);
+            buttons_down.insert(button);
+        }
 
         *self.last_mouse_position.borrow_mut() = position.clone();
         self.send_event(Event::MouseButtonDown { button, position });
     }
 
     fn button_up(&self, button: MouseButton, position: LogicalPosition) {
-        let mut buttons_down = self.buttons_down.borrow_mut();
-        buttons_down.remove(&button);
+        {
+            let mut buttons_down = self.buttons_down.borrow_mut();
+            buttons_down.remove(&button);
 
-        if buttons_down.is_empty() {
-            unsafe { SetCapture(HWND(null_mut())); }
+            if buttons_down.is_empty() {
+                unsafe { SetCapture(HWND(null_mut())); }
+            }
         }
 
         *self.last_mouse_position.borrow_mut() = position.clone();
