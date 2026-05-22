@@ -7,7 +7,7 @@ use keyboard_types::Code;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle, Win32WindowHandle};
 use uuid::Uuid;
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
-use windows::Win32::UI::WindowsAndMessaging::{GetParent, WM_CANCELMODE, WM_SETFOCUS};
+use windows::Win32::UI::WindowsAndMessaging::{GetParent, WM_CANCELMODE, WM_SETFOCUS, WM_SETCURSOR};
 use windows::{core::PCWSTR, Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_RWIN}};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::{Dwm::{DwmFlush, DwmIsCompositionEnabled}, Dxgi::{CreateDXGIFactory, IDXGIFactory, IDXGIOutput}, Gdi::{ClientToScreen, MonitorFromWindow, ScreenToClient, HBRUSH, MONITOR_DEFAULTTOPRIMARY}};
@@ -471,6 +471,11 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
 
                     DefWindowProcW(hwnd, msg, wparam, lparam)
                 }
+            }
+
+            WM_SETCURSOR => {
+                // Don't call DefWindowProcW to avoid that parent windows get a chance to revert or change ours (from `Self::set_cursor`)
+                LRESULT(1)
             }
 
             _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
