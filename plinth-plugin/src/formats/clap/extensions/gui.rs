@@ -92,6 +92,7 @@ impl<P: ClapPlugin> Gui<P> {
                 instance.host_ext_gui,
                 instance.host_ext_params,
                 instance.host_ext_state,
+                instance.host_ext_undo,
                 instance.parameter_event_map.clone(),
             ));
 

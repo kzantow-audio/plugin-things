@@ -1,6 +1,6 @@
-use std::{sync::{atomic::Ordering, Arc}};
+use std::{ptr::null, sync::{Arc, atomic::Ordering}};
 
-use clap_sys::{ext::{gui::clap_host_gui, params::clap_host_params, state::clap_host_state}, host::clap_host};
+use clap_sys::{ext::{draft::undo::clap_host_undo, gui::clap_host_gui, params::clap_host_params, state::clap_host_state}, host::clap_host};
 
 use crate::{Host, ParameterId, ParameterValue};
 
@@ -11,6 +11,7 @@ pub struct ClapHost {
     host_ext_gui: *const clap_host_gui,
     host_ext_params: *const clap_host_params,
     host_ext_state: *const clap_host_state,
+    host_ext_undo: *const clap_host_undo,
     parameter_event_map: Arc<ParameterEventMap>,
 }
 
@@ -20,6 +21,7 @@ impl ClapHost {
         host_ext_gui: *const clap_host_gui,
         host_ext_params: *const clap_host_params,
         host_ext_state: *const clap_host_state,
+        host_ext_undo: *const clap_host_undo,
         parameter_event_map: Arc<ParameterEventMap>,
     ) -> Self {
         assert!(!raw.is_null());
@@ -29,6 +31,7 @@ impl ClapHost {
             host_ext_gui,
             host_ext_params,
             host_ext_state,
+            host_ext_undo,
             parameter_event_map,
         }
     }
@@ -49,7 +52,7 @@ impl Host for ClapHost {
 
     fn start_parameter_change(&self, id: ParameterId) {
         self.parameter_event_map.parameter_event_info(id).change_started.store(true, Ordering::Release);
-        
+
         if !self.host_ext_params.is_null() {
             unsafe { ((*self.host_ext_params).request_flush.unwrap())(self.raw) };
         }
@@ -73,16 +76,28 @@ impl Host for ClapHost {
             unsafe { ((*self.host_ext_params).request_flush.unwrap())(self.raw) };
         }
     }
-    
+
     fn reload_parameters(&self) {
         if !self.host_ext_params.is_null() {
             unsafe { ((*self.host_ext_params).request_flush.unwrap())(self.raw) };
-        }        
+        }
     }
 
     fn mark_state_dirty(&self) {
         if !self.host_ext_state.is_null() {
             unsafe { ((*self.host_ext_state).mark_dirty.unwrap())(self.raw) };
+        }
+
+        if !self.host_ext_undo.is_null() {
+            unsafe {
+                ((*self.host_ext_undo).change_made.unwrap())(
+                    self.raw,
+                    c"".as_ptr(),
+                    null(),
+                    0,
+                    false,
+                )
+            };
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, ffi::{CStr, c_char, c_void}, iter::zip, ptr::{null, null_mut}, sync::{Arc, atomic::{AtomicBool, AtomicUsize, Ordering}}};
 
 use atomic_refcell::AtomicRefCell;
-use clap_sys::{events::clap_input_events, ext::{audio_ports::CLAP_EXT_AUDIO_PORTS, gui::{clap_host_gui, CLAP_EXT_GUI}, latency::CLAP_EXT_LATENCY, note_ports::CLAP_EXT_NOTE_PORTS, params::{clap_host_params, CLAP_EXT_PARAMS}, render::CLAP_EXT_RENDER, state::{clap_host_state, CLAP_EXT_STATE}, tail::{clap_host_tail, CLAP_EXT_TAIL}, timer_support::{clap_host_timer_support, CLAP_EXT_TIMER_SUPPORT}}, host::clap_host, plugin::clap_plugin, process::{clap_process, clap_process_status, CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_ERROR, CLAP_PROCESS_TAIL}};
+use clap_sys::{events::clap_input_events, ext::{audio_ports::CLAP_EXT_AUDIO_PORTS, draft::undo::{CLAP_EXT_UNDO, clap_host_undo}, gui::{CLAP_EXT_GUI, clap_host_gui}, latency::CLAP_EXT_LATENCY, note_ports::CLAP_EXT_NOTE_PORTS, params::{CLAP_EXT_PARAMS, clap_host_params}, render::CLAP_EXT_RENDER, state::{CLAP_EXT_STATE, clap_host_state}, tail::{CLAP_EXT_TAIL, clap_host_tail}, timer_support::{CLAP_EXT_TIMER_SUPPORT, clap_host_timer_support}}, host::clap_host, plugin::clap_plugin, process::{CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_ERROR, CLAP_PROCESS_TAIL, clap_process, clap_process_status}};
 use tracing::error;
 use plinth_core::signals::{ptr_signal::{PtrSignal, PtrSignalMut}, signal::SignalMut};
 use raw_window_handle::RawWindowHandle;
@@ -59,6 +59,7 @@ pub struct PluginInstance<P: ClapPlugin> {
     pub(super) host_ext_state: *const clap_host_state,
     host_ext_tail: *const clap_host_tail,
     pub(super) host_ext_timer_support: *const clap_host_timer_support,
+    pub(super) host_ext_undo: *const clap_host_undo,
 }
 
 impl<P: ClapPlugin> PluginInstance<P> {
@@ -148,6 +149,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
             host_ext_state: null(),
             host_ext_tail: null(),
             host_ext_timer_support: null(),
+            host_ext_undo: null(),
         }
     }
 
@@ -193,6 +195,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
             instance.host_ext_state = unsafe { ((*instance.host).get_extension.unwrap())(instance.host, CLAP_EXT_STATE.as_ptr()) as _ };
             instance.host_ext_tail = unsafe { ((*instance.host).get_extension.unwrap())(instance.host, CLAP_EXT_TAIL.as_ptr()) as _ };
             instance.host_ext_timer_support = unsafe { ((*instance.host).get_extension.unwrap())(instance.host, CLAP_EXT_TIMER_SUPPORT.as_ptr()) as _ };
+            instance.host_ext_undo = unsafe { ((*instance.host).get_extension.unwrap())(instance.host, CLAP_EXT_UNDO.as_ptr()) as _ };
 
             instance.plugin.as_mut().unwrap().init();
         });
