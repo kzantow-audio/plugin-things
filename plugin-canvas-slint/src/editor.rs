@@ -72,6 +72,11 @@ pub struct EditorHandle {
 }
 
 impl EditorHandle {
+    pub fn window(&self) -> Option<&plugin_canvas::Window> {
+        self.window_adapter()
+            .map(|window_adapter| window_adapter.plugin_canvas_window())
+    }
+
     pub fn on_frame(&self) {
         self.on_event(&Event::Draw);
     }

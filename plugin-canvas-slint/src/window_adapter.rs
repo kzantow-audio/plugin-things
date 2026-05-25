@@ -291,6 +291,10 @@ impl PluginCanvasWindowAdapter {
         }
     }
 
+    pub(crate) fn plugin_canvas_window(&self) -> &plugin_canvas::Window {
+        &self.plugin_canvas_window
+    }
+
     fn convert_button(button: &plugin_canvas::MouseButton) -> i_slint_core::platform::PointerEventButton {
         match button {
             plugin_canvas::MouseButton::Left => i_slint_core::platform::PointerEventButton::Left,
