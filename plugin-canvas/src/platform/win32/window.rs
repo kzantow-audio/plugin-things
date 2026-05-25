@@ -305,9 +305,12 @@ impl Drop for OsWindow {
 
         unsafe {
             SetWindowLongPtrW(self.hwnd(), GWLP_USERDATA, 0);
-            RevokeDragDrop(self.hwnd()).unwrap();
-            DestroyWindow(self.hwnd()).unwrap();
-            UnregisterClassW(PCWSTR(self.window_class as _), Some(PLUGIN_HINSTANCE.with(|hinstance| *hinstance))).unwrap();
+
+            // Allow these to fail since we're in Drop
+            // When the plugin instance has been deleted, the HWND might not be valid anymore
+            RevokeDragDrop(self.hwnd()).ok();
+            DestroyWindow(self.hwnd()).ok();
+            UnregisterClassW(PCWSTR(self.window_class as _), Some(PLUGIN_HINSTANCE.with(|hinstance| *hinstance))).ok();
         }
     }
 }
