@@ -6,7 +6,6 @@ use std::ptr::null_mut;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use atomic_refcell::AtomicRefCell;
 use plinth_core::signals::ptr_signal::{PtrSignal, PtrSignalMut};
 use plinth_core::signals::signal::SignalMut;
 use vst3::Steinberg::Vst::ControllerNumbers_::kPitchBend;
@@ -32,7 +31,7 @@ const ROOT_UNIT_ID: i32     = 0;
 const FIRST_UNIT_ID: i32    = 1;
 
 pub struct AudioThreadState<P: Vst3Plugin> {
-    processor: AtomicRefCell<Option<P::Processor>>,
+    processor: parking_lot::Mutex<Option<P::Processor>>,
     aux_active: AtomicBool,
 }
 
@@ -257,7 +256,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
             return kResultFalse;
         };
 
-        let mut processor = self.audio_thread_state.processor.borrow_mut();
+        let mut processor = self.audio_thread_state.processor.lock();
         *processor = Some(plugin.create_processor(processor_config));
 
         // Cache latency since it's not allowed to change during processing
@@ -272,7 +271,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
         let processing = state != 0;
         self.processing.store(processing, Ordering::Release);
 
-        let mut processor = self.audio_thread_state.processor.borrow_mut();
+        let mut processor = self.audio_thread_state.processor.lock();
         if let Some(processor) = processor.as_mut() && !processing {
             processor.reset();
         }
@@ -287,42 +286,60 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
         let parameter_change_iterator = ParameterChangeIterator::new(data.inputParameterChanges, *self.pitch_bend_parameter_ids.borrow());
         let event_iterator = EventIterator::new(data.inputEvents);
         let all_events = event_iterator.chain(parameter_change_iterator);
+        let is_data_dump = data.inputs.is_null() || data.outputs.is_null() || data.numInputs == 0 || data.numSamples == 0;
 
-        let mut processor = self.audio_thread_state.processor.borrow_mut();
+        // On some platforms, this cast is needed
+        #[allow(clippy::unnecessary_cast)]
+        if !is_data_dump && data.symbolicSampleSize != SymbolicSampleSizes_::kSample32 as i32 {
+            return kResultFalse;
+        }
+
+        // Prepare inputs & outputs
+        let (main_input, main_output, aux_input) = if is_data_dump {
+            (None, None, None)
+        } else {
+            let inputs = unsafe { std::slice::from_raw_parts(data.inputs, data.numInputs as _) };
+            let outputs = unsafe { std::slice::from_raw_parts(data.outputs, data.numOutputs as _) };
+            let main_input = inputs[0];
+            let main_output = outputs[0];
+            assert_eq!(main_input.numChannels, main_output.numChannels);
+
+            let aux_input = if P::HAS_AUX_INPUT && self.audio_thread_state.aux_active.load(Ordering::Acquire) {
+                assert_eq!(data.numInputs, 2);
+                let aux_input = inputs[1];
+                Some(unsafe { PtrSignal::from_pointers(aux_input.numChannels as usize, data.numSamples as usize, aux_input.__field0.channelBuffers32 as _) })
+            } else {
+                None
+            };
+
+            let main_input = unsafe { PtrSignal::from_pointers(main_input.numChannels as usize, data.numSamples as usize, main_input.__field0.channelBuffers32 as _) };
+            let main_output = unsafe { PtrSignalMut::from_pointers(main_output.numChannels as usize, data.numSamples as usize, main_output.__field0.channelBuffers32) };
+
+            (Some(main_input), Some(main_output), aux_input)
+        };
+
+        // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
+        // Contestion can only occur if we're setting up or tearing down the processor while process is called
+        // In that case, we will simply output silence
+        let Some(mut processor) = self.audio_thread_state.processor.try_lock() else {
+            if let Some(mut main_output) = main_output {
+                main_output.fill(0.0);
+            }
+
+            return kResultOk;
+        };
+
         let Some(processor) = processor.as_mut() else {
             return kResultFalse;
         };
 
-        let aux_active = self.audio_thread_state.aux_active.load(Ordering::Acquire);
-
-        // Empty input: this is a parameter dump
-        if data.inputs.is_null() || data.outputs.is_null() || data.numInputs == 0 || data.numSamples == 0 {
+        if is_data_dump {
             processor.process_events(all_events);
             return kResultOk;
         }
 
-        // On some platforms, this cast is needed
-        #[allow(clippy::unnecessary_cast)]
-        if data.symbolicSampleSize != SymbolicSampleSizes_::kSample32 as i32 {
-            return kResultFalse;
-        }
-
-        let inputs = unsafe { std::slice::from_raw_parts(data.inputs, data.numInputs as _) };
-        let outputs = unsafe { std::slice::from_raw_parts(data.outputs, data.numOutputs as _) };
-        let main_input = inputs[0];
-        let main_output = outputs[0];
-        assert_eq!(main_input.numChannels, main_output.numChannels);
-
-        let aux_input = if P::HAS_AUX_INPUT && aux_active {
-            assert_eq!(data.numInputs, 2);
-            let aux_input = inputs[1];
-            Some(unsafe { PtrSignal::from_pointers(aux_input.numChannels as usize, data.numSamples as usize, aux_input.__field0.channelBuffers32 as _) })
-        } else {
-            None
-        };
-
-        let main_input = unsafe { PtrSignal::from_pointers(main_input.numChannels as usize, data.numSamples as usize, main_input.__field0.channelBuffers32 as _) };
-        let mut main_output = unsafe { PtrSignalMut::from_pointers(main_output.numChannels as usize, data.numSamples as usize, main_output.__field0.channelBuffers32) };
+        let main_input = main_input.unwrap();
+        let mut main_output = main_output.unwrap();
 
         // If processing out-of-place, copy input to output
         if zip(main_input.pointers().iter(), main_output.pointers().iter())

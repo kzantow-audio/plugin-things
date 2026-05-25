@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, ffi::{CStr, c_char, c_void}, iter::zip, ptr::{null, null_mut}, sync::{Arc, atomic::{AtomicBool, AtomicUsize, Ordering}}};
 
-use atomic_refcell::AtomicRefCell;
 use clap_sys::{events::clap_input_events, ext::{audio_ports::CLAP_EXT_AUDIO_PORTS, draft::undo::{CLAP_EXT_UNDO, clap_host_undo}, gui::{CLAP_EXT_GUI, clap_host_gui}, latency::CLAP_EXT_LATENCY, note_ports::CLAP_EXT_NOTE_PORTS, params::{CLAP_EXT_PARAMS, clap_host_params}, render::CLAP_EXT_RENDER, state::{CLAP_EXT_STATE, clap_host_state}, tail::{CLAP_EXT_TAIL, clap_host_tail}, timer_support::{CLAP_EXT_TIMER_SUPPORT, clap_host_timer_support}}, host::clap_host, plugin::clap_plugin, process::{CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_ERROR, CLAP_PROCESS_TAIL, clap_process, clap_process_status}};
 use tracing::error;
 use plinth_core::signals::{ptr_signal::{PtrSignal, PtrSignalMut}, signal::SignalMut};
@@ -18,7 +17,7 @@ use super::plugin::ClapPlugin;
 pub struct AudioThreadState<P: ClapPlugin> {
     // When active is true, we have a processor
     pub(super) active: AtomicBool,
-    pub(super) processor: AtomicRefCell<Option<P::Processor>>,
+    pub(super) processor: parking_lot::Mutex<Option<P::Processor>>,
     pub(super) tail: AtomicUsize,
 }
 
@@ -230,7 +229,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
 
             instance.sample_rate = sample_rate;
 
-            let mut processor = instance.audio_thread_state.processor.borrow_mut();
+            let mut processor = instance.audio_thread_state.processor.lock();
             *processor = Some(instance.plugin.as_ref().unwrap().create_processor(config));
 
             instance.audio_thread_state.active.store(true, Ordering::Release);
@@ -243,7 +242,7 @@ impl<P: ClapPlugin> PluginInstance<P> {
         tracing::trace!("plugin::deactivate");
 
         Self::with_plugin_instance(plugin, |instance| {
-            *instance.audio_thread_state.processor.borrow_mut() = None;
+            *instance.audio_thread_state.processor.lock() = None;
             instance.audio_thread_state.active.store(false, Ordering::Release);
         });
     }
@@ -262,7 +261,9 @@ impl<P: ClapPlugin> PluginInstance<P> {
         tracing::trace!("plugin::reset");
 
         Self::with_plugin_instance(plugin, |instance| {
-            let mut processor = instance.audio_thread_state.processor.borrow_mut();
+            // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
+            // Contestion can only occur if we're setting up or tearing down the processor while reset is called
+            let mut processor = instance.audio_thread_state.processor.lock();
             if let Some(processor) = processor.as_mut() {
                 processor.reset();
             }
@@ -309,7 +310,15 @@ impl<P: ClapPlugin> PluginInstance<P> {
         }
 
         Self::with_plugin_instance(plugin, |instance| {
-            let mut processor_ref = instance.audio_thread_state.processor.borrow_mut();
+            // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
+            // Contestion can only occur if we're setting up or tearing down the processor while process is called
+            // In that case, we will simply output silence
+            let Some(mut processor_ref) = instance.audio_thread_state.processor.try_lock() else {
+                output.fill(0.0);
+
+                return CLAP_PROCESS_CONTINUE;
+            };
+
             let Some(processor) = processor_ref.as_mut() else {
                 return CLAP_PROCESS_ERROR;
             };

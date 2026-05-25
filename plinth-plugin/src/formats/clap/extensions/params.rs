@@ -142,12 +142,19 @@ impl<P: ClapPlugin> Params<P> {
         PluginInstance::with_plugin_instance(plugin, |instance: &mut PluginInstance<P>| {
             instance.process_events_to_plugin();
 
-            let host_events = EventIterator::new(&instance.parameter_info, unsafe { &*in_events });    
+            let host_events = EventIterator::new(&instance.parameter_info, unsafe { &*in_events });
             let editor_events = instance.parameter_event_map.iter_and_send_to_host(&instance.parameter_info, out_events);
             let all_events = host_events.chain(editor_events);
 
             if instance.audio_thread_state.active.load(Ordering::Acquire) {
-                let mut processor_ref = instance.audio_thread_state.processor.borrow_mut();
+                // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
+                // Contestion can only occur if we're setting up or tearing down the processor while flush is called
+                // In that case, ignore the flush call and request a new flush
+                let Some(mut processor_ref) = instance.audio_thread_state.processor.try_lock() else {
+                    unsafe { ((*instance.host_ext_params).request_flush.unwrap())(instance.host) };
+                    return;
+                };
+
                 let Some(processor) = processor_ref.as_mut() else {
                     return;
                 };
@@ -155,10 +162,10 @@ impl<P: ClapPlugin> Params<P> {
                 // When we have a processor, process events directly
                 processor.process_events(all_events);
                 drop(processor_ref);
-    
+
                 // Also send them to the main thread through the queue
                 instance.send_events_to_plugin(in_events);
-    
+
                 // Send a callback request so the main thread can process them
                 unsafe { ((*instance.host).request_callback.unwrap())(instance.host); }
             } else {

@@ -12,11 +12,11 @@ license = "MIT"
 standalone = ["dep:cpal", "dep:midir", "dep:winit"]
 
 [dependencies]
-atomic_refcell = "0.1"
 clap-sys = "0.5"
 keyboard-types.workspace = true
 num-derive = "0.4"
 num-traits.workspace = true
+parking_lot = "0.12"
 plinth-core.workspace = true
 portable-atomic.workspace = true
 raw-window-handle.workspace = true
