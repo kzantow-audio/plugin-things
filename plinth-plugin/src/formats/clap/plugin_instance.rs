@@ -261,8 +261,8 @@ impl<P: ClapPlugin> PluginInstance<P> {
         tracing::trace!("plugin::reset");
 
         Self::with_plugin_instance(plugin, |instance| {
-            // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
-            // Contestion can only occur if we're setting up or tearing down the processor while reset is called
+            // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontented
+            // contention can only occur if we're setting up or tearing down the processor while reset is called
             let mut processor = instance.audio_thread_state.processor.lock();
             if let Some(processor) = processor.as_mut() {
                 processor.reset();
@@ -310,8 +310,8 @@ impl<P: ClapPlugin> PluginInstance<P> {
         }
 
         Self::with_plugin_instance(plugin, |instance| {
-            // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
-            // Contestion can only occur if we're setting up or tearing down the processor while process is called
+            // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontented
+            // contention can only occur if we're setting up or tearing down the processor while process is called
             // In that case, we will simply output silence
             let Some(mut processor_ref) = instance.audio_thread_state.processor.try_lock() else {
                 output.fill(0.0);

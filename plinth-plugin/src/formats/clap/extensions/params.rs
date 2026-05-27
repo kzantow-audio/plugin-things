@@ -147,8 +147,8 @@ impl<P: ClapPlugin> Params<P> {
             let all_events = host_events.chain(editor_events);
 
             if instance.audio_thread_state.active.load(Ordering::Acquire) {
-                // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
-                // Contestion can only occur if we're setting up or tearing down the processor while flush is called
+                // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontented
+                // contention can only occur if we're setting up or tearing down the processor while flush is called
                 // In that case, ignore the flush call and request a new flush
                 let Some(mut processor_ref) = instance.audio_thread_state.processor.try_lock() else {
                     unsafe { ((*instance.host_ext_params).request_flush.unwrap())(instance.host) };

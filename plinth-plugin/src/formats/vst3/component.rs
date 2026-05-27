@@ -318,8 +318,8 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
             (Some(main_input), Some(main_output), aux_input)
         };
 
-        // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontested
-        // Contestion can only occur if we're setting up or tearing down the processor while process is called
+        // Real-time safety: parking_lot Mutex is guaranteed to not do syscalls when uncontented
+        // contention can only occur if we're setting up or tearing down the processor while process is called
         // In that case, we will simply output silence
         let Some(mut processor) = self.audio_thread_state.processor.try_lock() else {
             if let Some(mut main_output) = main_output {
