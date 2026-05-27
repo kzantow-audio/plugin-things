@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::num::NonZero;
 use std::sync::Weak;
 use std::{cell::RefCell, ffi::OsString, mem::{size_of, transmute}, num::NonZeroIsize, os::windows::prelude::OsStringExt, ptr::{null, null_mut}, sync::{atomic::{AtomicBool, Ordering}, Arc}, time::Duration};
 
@@ -161,7 +162,12 @@ impl OsWindowInterface for OsWindow {
         };
         unsafe { TrackMouseEvent(&mut tracking_info).unwrap() };
 
-        let window_handle = Win32WindowHandle::new(NonZeroIsize::new(hwnd.0 as _).unwrap());
+        let mut window_handle = Win32WindowHandle::new(NonZeroIsize::new(hwnd.0 as _).unwrap());
+        PLUGIN_HINSTANCE.with(|instance| {
+            if let Some(instance) = NonZero::new(instance.0 as isize) {
+                window_handle.hinstance = Some(instance);
+            }
+        });
 
         let running: Arc<AtomicBool> = Arc::new(true.into());
         let moved: Arc<AtomicBool> = Arc::new(false.into());
