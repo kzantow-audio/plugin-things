@@ -48,6 +48,10 @@ impl OsWindow {
         HWND(self.window_handle.hwnd.get() as _)
     }
 
+    pub(super) fn scale(&self) -> f64 {
+        self.scale.load(Ordering::Acquire)
+    }
+
     fn button_down(&self, button: MouseButton, position: LogicalPosition) {
         {
             let mut buttons_down = self.buttons_down.borrow_mut();

@@ -6,18 +6,17 @@ use std::ptr::null_mut;
 use std::sync::Weak;
 
 use windows::Win32::Foundation::{POINTL, POINT};
-use windows::Win32::Graphics::Gdi::MapWindowPoints;
+use windows::Win32::Graphics::Gdi::ScreenToClient;
 use windows::Win32::System::Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL};
 use windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS;
+use windows::Win32::UI::HiDpi::{LogicalToPhysicalPointForPerMonitorDPI, PhysicalToLogicalPointForPerMonitorDPI};
 use windows::Win32::UI::Shell::{DragQueryFileW, HDROP};
 use windows::core::implement;
 use windows::Win32::System::Ole::{IDropTarget, IDropTarget_Impl, DROPEFFECT, CF_HDROP, DROPEFFECT_NONE, DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_LINK};
-use windows::Win32::UI::WindowsAndMessaging::HWND_DESKTOP;
 
 use crate::event::EventResponse;
-use crate::platform::interface::OsWindowInterface;
 use crate::thread_bound::ThreadBound;
-use crate::{LogicalPosition, PhysicalPosition};
+use crate::LogicalPosition;
 use crate::drag_drop::{DropData, DropOperation};
 use super::window::OsWindow;
 
@@ -52,7 +51,7 @@ impl DropTarget {
         unsafe {
             let medium = data_object.GetData(&format)?;
             let hdrop = HDROP(medium.u.hGlobal.0);
-       
+
             let item_count = DragQueryFileW(hdrop, 0xFFFFFFFF, None);
             if item_count == 0 {
                 *self.drop_data.borrow_mut() = DropData::None;
@@ -91,24 +90,29 @@ impl DropTarget {
         }
     }
 
-    fn convert_coordinates(&self, point: &POINTL) -> LogicalPosition {
-        let Some(window) = self.window.upgrade() else {
-            return LogicalPosition::default();
-        };
+    fn convert_coordinates(&self, point: &POINTL) -> Option<LogicalPosition> {
+        let window = self.window.upgrade()?;
 
-        let scale = window.os_scale();
+        let scale = window.scale();
+        let mut point = POINT { x: (point.x as f64) as _, y: (point.y as f64) as _ };
 
-        // It looks like MapWindowPoints isn't DPI aware (and neither is ScreenToClient),
-        // so we need to pre-scale the point here?
-        // TODO: Find out what's going on
-        let mut points = [POINT { x: (point.x as f64 / scale) as i32, y: (point.y as f64 / scale) as i32 }];
+        // ScreenToClient doesn't seem to be DPI-aware
+        if unsafe { !PhysicalToLogicalPointForPerMonitorDPI(None, &mut point).as_bool() } {
+            return None;
+        }
 
-        unsafe { MapWindowPoints(Some(HWND_DESKTOP), Some(window.hwnd()), &mut points); }
+        if unsafe { !ScreenToClient(window.hwnd(), &mut point).as_bool() } {
+            return None;
+        }
 
-        PhysicalPosition {
-            x: points[0].x,
-            y: points[0].y,
-        }.to_logical(1.0)
+        if unsafe { !LogicalToPhysicalPointForPerMonitorDPI(None, &mut point).as_bool() } {
+            return None;
+        }
+
+        Some(LogicalPosition {
+            x: point.x as f64 / scale,
+            y: point.y as f64 / scale,
+        })
     }
 }
 
@@ -121,13 +125,15 @@ impl IDropTarget_Impl for DropTarget_Impl {
 
         self.parse_drag_data(pdataobj)?;
 
-        let response = window.send_event(crate::Event::DragEntered {
-            position: self.convert_coordinates(pt),
-            data: self.drop_data.borrow().clone(),
-        });
-        
-        unsafe { *pdweffect = self.convert_drag_operation(response) };
-                
+        if let Some(position) = self.convert_coordinates(pt) {
+            let response = window.send_event(crate::Event::DragEntered {
+                position,
+                data: self.drop_data.borrow().clone(),
+            });
+
+            unsafe { *pdweffect = self.convert_drag_operation(response) };
+        }
+
         Ok(())
     }
 
@@ -136,12 +142,14 @@ impl IDropTarget_Impl for DropTarget_Impl {
             return Ok(());
         };
 
-        let response = window.send_event(crate::Event::DragMoved {
-            position: self.convert_coordinates(pt),
-            data: self.drop_data.borrow().clone(),
-        });
-        
-        unsafe { *pdweffect = self.convert_drag_operation(response) };
+        if let Some(position) = self.convert_coordinates(pt) {
+            let response = window.send_event(crate::Event::DragMoved {
+                position,
+                data: self.drop_data.borrow().clone(),
+            });
+
+            unsafe { *pdweffect = self.convert_drag_operation(response) };
+        }
 
         Ok(())
     }
@@ -163,12 +171,14 @@ impl IDropTarget_Impl for DropTarget_Impl {
 
         self.parse_drag_data(pdataobj)?;
 
-        let response = window.send_event(crate::Event::DragDropped {
-            position: self.convert_coordinates(pt),
-            data: self.drop_data.borrow().clone(),
-        });
-        
-        unsafe { *pdweffect = self.convert_drag_operation(response) };
+        if let Some(position) = self.convert_coordinates(pt) {
+            let response = window.send_event(crate::Event::DragDropped {
+                position,
+                data: self.drop_data.borrow().clone(),
+            });
+
+            unsafe { *pdweffect = self.convert_drag_operation(response) };
+        }
 
         Ok(())
     }
