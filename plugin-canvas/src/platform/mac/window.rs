@@ -259,7 +259,8 @@ impl OsWindowInterface for OsWindow {
     }
 
     fn warp_mouse(&self, position: LogicalPosition) {
-        let window_position = self.view().convertPoint_toView(CGPoint::new(position.x, position.y), None);
+        let scale = self.view().scale();
+        let window_position = self.view().convertPoint_toView(CGPoint::new(position.x * scale, position.y * scale), None);
         let screen_position = self.view().window().unwrap().convertPointToScreen(window_position);
         let screen_height = NSScreen::mainScreen(self.main_thread_marker).unwrap().frame().size.height;
         let cg_point = CGPoint::new(screen_position.x, screen_height - screen_position.y);

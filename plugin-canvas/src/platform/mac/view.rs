@@ -110,6 +110,10 @@ impl OsWindowView {
         })
     }
 
+    pub(crate) fn scale(&self) -> f64 {
+        self.with_context(|context| context.scale.load(Ordering::Acquire))
+    }
+
     pub(crate) fn set_scale(&self, scale: f64) {
         self.with_context(|context| context.scale.store(scale, Ordering::Release));
     }
