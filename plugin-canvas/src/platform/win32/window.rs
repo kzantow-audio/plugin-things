@@ -5,6 +5,7 @@ use std::{cell::RefCell, ffi::OsString, mem::{size_of, transmute}, num::NonZeroI
 
 use cursor_icon::CursorIcon;
 use keyboard_types::Code;
+use portable_atomic::AtomicF64;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle, Win32WindowHandle};
 use uuid::Uuid;
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
@@ -33,6 +34,7 @@ pub struct OsWindow {
 
     running: Arc<AtomicBool>,
     moved: Arc<AtomicBool>,
+    scale: AtomicF64,
 
     keyboard_modifiers: RefCell<KeyboardModifiers>,
 }
@@ -76,7 +78,7 @@ impl OsWindow {
     }
 
     fn logical_mouse_position(&self, lparam: LPARAM) -> LogicalPosition {
-        let scale = self.os_scale();
+        let scale = self.os_scale() * self.scale.load(Ordering::Acquire);
 
         PhysicalPosition {
             x: (lparam.0 & 0xFFFF) as i16 as i32,
@@ -202,6 +204,7 @@ impl OsWindowInterface for OsWindow {
 
             running,
             moved,
+            scale: window_attributes.scale().into(),
 
             keyboard_modifiers: Default::default(),
         };
@@ -226,8 +229,10 @@ impl OsWindowInterface for OsWindow {
         1.0
     }
 
-    fn resized(&self, size: LogicalSize) {
+    fn resized(&self, size: LogicalSize, scale: f64) {
         unsafe { MoveWindow(self.hwnd(), 0, 0, size.width as _, size.height as _, true).unwrap(); }
+
+        self.scale.store(scale, Ordering::Release);
     }
 
     fn set_cursor(&self, cursor: Option<CursorIcon>) {
