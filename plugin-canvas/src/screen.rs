@@ -1,3 +1,19 @@
+#[cfg(target_os = "linux")]
+pub fn screen_scale() -> f64 {
+    use x11rb::connection::Connection;
+
+    if let Ok((connection, screen_num)) = x11rb::connect(None) {
+        let screen = &connection.setup().roots[screen_num];
+        if screen.height_in_pixels > 0 && screen.height_in_millimeters > 0 {
+            (screen.height_in_pixels as f64 * 25.4 / screen.height_in_millimeters as f64) / 96.0
+        } else {
+            1.0
+        }
+    } else {
+        1.0
+    }
+}
+
 // Panics if not called from the main thread
 #[cfg(target_os = "macos")]
 pub fn screen_scale() -> f64 {
