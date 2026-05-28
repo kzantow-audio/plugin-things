@@ -3,6 +3,7 @@ use std::{cell::RefCell, ffi::OsStr, num::NonZeroU32, ptr::NonNull, sync::atomic
 
 use cursor_icon::CursorIcon;
 use keyboard_types::Code;
+use portable_atomic::AtomicF64;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle, XcbDisplayHandle, XcbWindowHandle};
 use x11rb::{COPY_DEPTH_FROM_PARENT, COPY_FROM_PARENT};
 use x11rb::connection::Connection;
@@ -30,6 +31,7 @@ pub struct OsWindow {
     keyboard_modifiers: RefCell<KeyboardModifiers>,
 
     showing_cursor: AtomicBool,
+    scale: AtomicF64,
 }
 
 impl OsWindow {
@@ -42,16 +44,13 @@ impl OsWindow {
             x11rb::protocol::Event::ButtonPress(event) => {
                 self.update_modifiers_from_mask(event.state);
 
-                let position = LogicalPosition {
-                    x: event.event_x as _,
-                    y: event.event_y as _,
-                };
+                let position = self.convert_mouse_position(event.event_x, event.event_y);
 
                 if let Some(button) = Self::mouse_button_from_detail(event.detail) {
                     self.send_event(Event::MouseButtonDown {
                         button,
                         position,
-                    });    
+                    });
                 } else if [4, 5].contains(&event.detail) {
                     let delta_y = if event.detail == 4 {
                         1.0
@@ -70,16 +69,13 @@ impl OsWindow {
             x11rb::protocol::Event::ButtonRelease(event) => {
                 self.update_modifiers_from_mask(event.state);
 
-                let position = LogicalPosition {
-                    x: event.event_x as _,
-                    y: event.event_y as _,
-                };
+                let position = self.convert_mouse_position(event.event_x, event.event_y);
 
                 if let Some(button) = Self::mouse_button_from_detail(event.detail) {
                     self.send_event(Event::MouseButtonUp {
                         button,
                         position,
-                    });    
+                    });
                 }
             }
 
@@ -132,7 +128,7 @@ impl OsWindow {
 
                 let text = xkb_state.key_get_utf8(x11_keycode);
                 xkb_state.update_key(x11_keycode, xkb::KeyDirection::Up);
-                
+
                 self.send_event(Event::KeyUp {
                     key_code: keycode,
                     text: Some(text),
@@ -146,14 +142,11 @@ impl OsWindow {
             x11rb::protocol::Event::MotionNotify(event) => {
                 self.update_modifiers_from_mask(event.state);
 
-                let position = LogicalPosition {
-                    x: event.event_x as _,
-                    y: event.event_y as _,
-                };
+                let position = self.convert_mouse_position(event.event_x, event.event_y);
 
                 self.send_event(Event::MouseMoved { position });
             }
-            
+
             _ => {},
         }
 
@@ -166,6 +159,15 @@ impl OsWindow {
             2 => Some(MouseButton::Middle),
             3 => Some(MouseButton::Right),
             _ => None,
+        }
+    }
+
+    fn convert_mouse_position(&self, x: i16, y: i16) -> LogicalPosition {
+        let scale = self.scale.load(Ordering::Acquire);
+
+        LogicalPosition {
+            x: x as f64 / scale,
+            y: y as f64 / scale,
         }
     }
 
@@ -220,7 +222,7 @@ impl OsWindow {
         locales.push("C".into());
 
         let mut xkb_compose_state = None;
-        
+
         for locale in locales.iter() {
             if let Ok(compose_table) = xkb::compose::Table::new_from_locale(&xkb_context, OsStr::new(&locale), 0) {
                 xkb_compose_state = Some(xkb::compose::State::new(&compose_table, 0));
@@ -265,11 +267,11 @@ impl OsWindowInterface for OsWindow {
             COPY_FROM_PARENT,
             &CreateWindowAux::new()
                 .event_mask(
-                    EventMask::BUTTON_PRESS | 
+                    EventMask::BUTTON_PRESS |
                     EventMask::BUTTON_RELEASE |
-                    EventMask::KEY_PRESS | 
-                    EventMask::KEY_RELEASE | 
-                    EventMask::LEAVE_WINDOW | 
+                    EventMask::KEY_PRESS |
+                    EventMask::KEY_RELEASE |
+                    EventMask::LEAVE_WINDOW |
                     EventMask::POINTER_MOTION
                 ),
         )?;
@@ -298,6 +300,7 @@ impl OsWindowInterface for OsWindow {
             keyboard_modifiers: KeyboardModifiers::empty().into(),
 
             showing_cursor: true.into(),
+            scale: window_attributes.scale().into(),
         };
 
         Ok(OsWindowHandle::new(Arc::new(window.into())))
@@ -307,13 +310,15 @@ impl OsWindowInterface for OsWindow {
         1.0
     }
 
-    fn resized(&self, size: crate::LogicalSize) {
+    fn resized(&self, size: crate::LogicalSize, scale: f64) {
         self.connection.configure_window(
             self.window_handle.window.into(),
             &ConfigureWindowAux::new()
                 .width(size.width as u32)
                 .height(size.height as u32),
         ).unwrap();
+
+        self.scale.store(scale, Ordering::Release);
     }
 
     fn set_cursor(&self, cursor: Option<cursor_icon::CursorIcon>) {

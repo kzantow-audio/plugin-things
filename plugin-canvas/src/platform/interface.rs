@@ -14,7 +14,7 @@ pub(crate) trait OsWindowInterface: HasDisplayHandle + HasWindowHandle + Sized {
 
     fn os_scale(&self) -> f64;
 
-    fn resized(&self, size: LogicalSize);
+    fn resized(&self, size: LogicalSize, scale: f64);
 
     fn set_cursor(&self, cursor: Option<CursorIcon>);
     fn set_input_focus(&self, focus: bool);
