@@ -52,7 +52,11 @@ impl PluginCanvasWindowAdapter {
         let window_attributes = plugin_canvas_window.attributes();
 
         let scale = window_attributes.scale();
-        let combined_scale = scale * plugin_canvas_window.os_scale();
+        let mut combined_scale = scale;
+        if cfg!(target_os = "macos") {
+            combined_scale *= plugin_canvas_window.os_scale();
+        }
+
         let plugin_canvas_size = window_attributes.size() * combined_scale;
 
         let slint_size = slint::PhysicalSize {
@@ -118,7 +122,10 @@ impl PluginCanvasWindowAdapter {
     pub fn set_scale(&self, scale: f64) {
         self.scale.store(scale, Ordering::Release);
 
-        let combined_scale = scale * self.plugin_canvas_window.os_scale();
+        let mut combined_scale = scale;
+        if cfg!(target_os = "macos") {
+            combined_scale *= self.plugin_canvas_window.os_scale();
+        }
 
         self.slint_window.dispatch_event(
             WindowEvent::ScaleFactorChanged { scale_factor: combined_scale as f32 }
@@ -349,15 +356,18 @@ impl WindowAdapter for PluginCanvasWindowAdapter {
 
     fn set_size(&self, size: slint::WindowSize) {
         let scale = self.scale.load(Ordering::Acquire);
-        let os_scale = self.plugin_canvas_window.os_scale();
+        let os_scale = if cfg!(target_os = "macos") {
+            self.plugin_canvas_window.os_scale()
+        } else {
+            1.0
+        };
 
         let physical_size = size.to_physical(os_scale as _);
-        let logical_size = size.to_logical(os_scale as _);
+        let mut logical_size = size.to_logical(os_scale as _);
 
         *self.physical_size.borrow_mut() = physical_size;
         self.plugin_canvas_window.resized(LogicalSize::new(logical_size.width as _, logical_size.height as _), scale);
 
-        let mut logical_size = size.to_logical(os_scale as _);
         logical_size.width /= scale as f32;
         logical_size.height /= scale as f32;
 

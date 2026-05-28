@@ -82,7 +82,7 @@ impl OsWindow {
     }
 
     fn logical_mouse_position(&self, lparam: LPARAM) -> LogicalPosition {
-        let scale = self.os_scale() * self.scale.load(Ordering::Acquire);
+        let scale = self.scale.load(Ordering::Acquire);
 
         PhysicalPosition {
             x: (lparam.0 & 0xFFFF) as i16 as i32,
