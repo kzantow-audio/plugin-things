@@ -70,8 +70,8 @@ impl Window {
         self.os_window_handle.os_scale()
     }
 
-    pub fn resized(&self, size: LogicalSize) {
-        self.os_window_handle.resized(size);
+    pub fn resized(&self, size: LogicalSize, scale: f64) {
+        self.os_window_handle.resized(size, scale);
     }
 
     /// This only needs to be called on Linux

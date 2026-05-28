@@ -125,6 +125,7 @@ impl OsWindowInterface for OsWindow {
         }
 
         view.set_os_window_ptr(Arc::downgrade(&window).into_raw() as _);
+        view.set_scale(window_attributes.scale());
 
         Ok(OsWindowHandle::new(window))
     }
@@ -136,13 +137,14 @@ impl OsWindowInterface for OsWindow {
             .unwrap_or(1.0)
     }
 
-    fn resized(&self, size: crate::LogicalSize) {
+    fn resized(&self, size: crate::LogicalSize, scale: f64) {
         let cg_size = CGSize {
             width: size.width as _,
             height: size.height as _,
         };
 
         self.view().setFrameSize(cg_size);
+        self.view().set_scale(scale);
     }
 
     fn set_cursor(&self, cursor: Option<CursorIcon>) {

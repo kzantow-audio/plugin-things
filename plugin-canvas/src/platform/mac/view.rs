@@ -5,6 +5,7 @@ use objc2::runtime::{Sel, ProtocolObject};
 use objc2_app_kit::{NSDragOperation, NSDraggingInfo, NSEvent, NSEventModifierFlags, NSPasteboardTypeFileURL, NSView};
 use objc2_foundation::{NSPoint, NSRect, NSTimer, NSURL};
 use objc2_quartz_core::CADisplayLink;
+use portable_atomic::AtomicF64;
 use uuid::Uuid;
 
 use crate::{drag_drop::{DropData, DropOperation}, event::EventResponse, keyboard::KeyboardModifiers, thread_bound::ThreadBound, Event, LogicalPosition, MouseButton};
@@ -19,6 +20,7 @@ struct Context {
     os_window_ptr: AtomicPtr<ThreadBound<OsWindow>>,
     input_focus: AtomicU8,
     keyboard_modifiers: RefCell<KeyboardModifiers>,
+    scale: AtomicF64,
 }
 
 unsafe impl Encode for Context {
@@ -28,6 +30,7 @@ unsafe impl Encode for Context {
             AtomicPtr::<c_void>::ENCODING,
             AtomicU8::ENCODING,
             AtomicUsize::ENCODING,
+            f64::ENCODING,
         ]
     );
 }
@@ -107,6 +110,10 @@ impl OsWindowView {
         })
     }
 
+    pub(crate) fn set_scale(&self, scale: f64) {
+        self.with_context(|context| context.scale.store(scale, Ordering::Release));
+    }
+
     fn with_context<T>(&self, f: impl FnOnce(&Context) -> T) -> T {
         let ivar = self.class().instance_variable(c"_context").unwrap();
         let context: &Context = unsafe { ivar.load(self) };
@@ -131,7 +138,7 @@ impl OsWindowView {
 
     fn key_event_text(&self, event: *const NSEvent) -> Option<String> {
         assert!(!event.is_null());
-        
+
         unsafe {
             (*event)
                 .characters()
@@ -163,7 +170,7 @@ impl OsWindowView {
             self.send_event(Event::KeyboardModifiers { modifiers: new_modifiers });
         });
     }
-    
+
     fn handle_mouse_move_event(&self, event: *const NSEvent) {
         self.handle_modifier_event(event);
 
@@ -220,10 +227,11 @@ impl OsWindowView {
 
     fn window_point_to_position(&self, point_in_window: NSPoint) -> LogicalPosition {
         let local_position = self.convertPoint_fromView(point_in_window, None);
+        let scale = self.with_context(|context| context.scale.load(Ordering::Acquire));
 
         LogicalPosition {
-            x: local_position.x,
-            y: local_position.y,
+            x: local_position.x / scale,
+            y: local_position.y / scale,
         }
     }
 
@@ -300,7 +308,7 @@ impl OsWindowView {
 
     unsafe extern "C" fn key_down(&self, _cmd: Sel, event: *const NSEvent) {
         let code = unsafe { (*event).keyCode() };
-        let text = self.key_event_text(event); 
+        let text = self.key_event_text(event);
 
         self.send_event(
             Event::KeyDown {
@@ -316,7 +324,7 @@ impl OsWindowView {
 
     unsafe extern "C" fn key_up(&self, _cmd: Sel, event: *const NSEvent) {
         let code = unsafe { (*event).keyCode() };
-        let text = self.key_event_text(event); 
+        let text = self.key_event_text(event);
 
         self.send_event(
             Event::KeyUp {

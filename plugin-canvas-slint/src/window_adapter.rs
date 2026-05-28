@@ -319,11 +319,9 @@ impl PluginCanvasWindowAdapter {
     }
 
     fn convert_logical_position(&self, position: &plugin_canvas::LogicalPosition) -> slint::LogicalPosition {
-        let scale = self.scale.load(Ordering::Acquire);
-
         slint::LogicalPosition {
-            x: (position.x / scale) as _,
-            y: (position.y / scale) as _,
+            x: position.x as _,
+            y: position.y as _,
         }
     }
 }
@@ -357,7 +355,7 @@ impl WindowAdapter for PluginCanvasWindowAdapter {
         let logical_size = size.to_logical(os_scale as _);
 
         *self.physical_size.borrow_mut() = physical_size;
-        self.plugin_canvas_window.resized(LogicalSize::new(logical_size.width as _, logical_size.height as _));
+        self.plugin_canvas_window.resized(LogicalSize::new(logical_size.width as _, logical_size.height as _), scale);
 
         let mut logical_size = size.to_logical(os_scale as _);
         logical_size.width /= scale as f32;
