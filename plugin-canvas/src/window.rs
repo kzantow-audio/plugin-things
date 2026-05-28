@@ -66,10 +66,6 @@ impl Window {
         &self.attributes
     }
 
-    pub fn os_scale(&self) -> f64 {
-        self.os_window_handle.os_scale()
-    }
-
     pub fn resized(&self, size: LogicalSize, scale: f64) {
         self.os_window_handle.resized(size, scale);
     }

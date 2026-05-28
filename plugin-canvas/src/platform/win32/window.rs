@@ -229,10 +229,6 @@ impl OsWindowInterface for OsWindow {
         Ok(OsWindowHandle::new(window))
     }
 
-    fn os_scale(&self) -> f64 {
-        1.0
-    }
-
     fn resized(&self, size: LogicalSize, scale: f64) {
         unsafe { MoveWindow(self.hwnd(), 0, 0, size.width as _, size.height as _, true).unwrap(); }
 

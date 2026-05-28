@@ -3,6 +3,7 @@ pub mod drag_drop;
 pub mod error;
 pub mod event;
 pub mod keyboard;
+pub mod screen;
 pub mod thread_bound;
 pub mod window;
 

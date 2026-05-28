@@ -13,6 +13,7 @@ use keyboard_types::Code;
 #[cfg(target_os="macos")]
 use plugin_canvas::is_macos_version_at_least;
 use plugin_canvas::keyboard::KeyboardModifiers;
+use plugin_canvas::screen::screen_scale;
 use plugin_canvas::{event::EventResponse, LogicalSize};
 use portable_atomic::AtomicF64;
 
@@ -54,7 +55,7 @@ impl PluginCanvasWindowAdapter {
         let scale = window_attributes.scale();
         let mut combined_scale = scale;
         if cfg!(target_os = "macos") {
-            combined_scale *= plugin_canvas_window.os_scale();
+            combined_scale *= screen_scale();
         }
 
         let plugin_canvas_size = window_attributes.size() * combined_scale;
@@ -124,7 +125,7 @@ impl PluginCanvasWindowAdapter {
 
         let mut combined_scale = scale;
         if cfg!(target_os = "macos") {
-            combined_scale *= self.plugin_canvas_window.os_scale();
+            combined_scale *= screen_scale();
         }
 
         self.slint_window.dispatch_event(
@@ -356,14 +357,14 @@ impl WindowAdapter for PluginCanvasWindowAdapter {
 
     fn set_size(&self, size: slint::WindowSize) {
         let scale = self.scale.load(Ordering::Acquire);
-        let os_scale = if cfg!(target_os = "macos") {
-            self.plugin_canvas_window.os_scale()
+        let screen_scale = if cfg!(target_os = "macos") {
+            screen_scale()
         } else {
             1.0
         };
 
-        let physical_size = size.to_physical(os_scale as _);
-        let mut logical_size = size.to_logical(os_scale as _);
+        let physical_size = size.to_physical(screen_scale as _);
+        let mut logical_size = size.to_logical(screen_scale as _);
 
         *self.physical_size.borrow_mut() = physical_size;
         self.plugin_canvas_window.resized(LogicalSize::new(logical_size.width as _, logical_size.height as _), scale);

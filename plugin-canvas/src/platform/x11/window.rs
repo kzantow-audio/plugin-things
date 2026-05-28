@@ -306,10 +306,6 @@ impl OsWindowInterface for OsWindow {
         Ok(OsWindowHandle::new(Arc::new(window.into())))
     }
 
-    fn os_scale(&self) -> f64 {
-        1.0
-    }
-
     fn resized(&self, size: crate::LogicalSize, scale: f64) {
         self.connection.configure_window(
             self.window_handle.window.into(),

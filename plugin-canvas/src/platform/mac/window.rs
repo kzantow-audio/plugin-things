@@ -130,13 +130,6 @@ impl OsWindowInterface for OsWindow {
         Ok(OsWindowHandle::new(window))
     }
 
-    fn os_scale(&self) -> f64 {
-        self.view()
-            .window()
-            .map(|window| window.backingScaleFactor())
-            .unwrap_or(1.0)
-    }
-
     fn resized(&self, size: crate::LogicalSize, scale: f64) {
         let cg_size = CGSize {
             width: size.width as _,

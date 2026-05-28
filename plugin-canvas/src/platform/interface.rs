@@ -12,8 +12,6 @@ pub(crate) trait OsWindowInterface: HasDisplayHandle + HasWindowHandle + Sized {
         event_callback: Box<EventCallback>,
     ) -> Result<OsWindowHandle, Error>;
 
-    fn os_scale(&self) -> f64;
-
     fn resized(&self, size: LogicalSize, scale: f64);
 
     fn set_cursor(&self, cursor: Option<CursorIcon>);
