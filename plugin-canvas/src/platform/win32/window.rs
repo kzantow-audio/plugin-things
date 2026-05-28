@@ -293,12 +293,11 @@ impl OsWindowInterface for OsWindow {
     }
 
     fn warp_mouse(&self, position: LogicalPosition) {
-        let scale = self.os_scale();
-        let physical_position = position.to_physical(scale);
+        let scale = self.scale();
 
         let mut point = POINT {
-            x: physical_position.x,
-            y: physical_position.y,
+            x: (position.x * scale) as _,
+            y: (position.y * scale) as _,
         };
 
         unsafe {
