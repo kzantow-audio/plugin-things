@@ -7,6 +7,7 @@ use crate::dimensions::LogicalSize;
 use crate::error::Error;
 use crate::event::EventCallback;
 use crate::platform::{window::OsWindow, interface::OsWindowInterface};
+use crate::screen::screen_scale;
 
 #[derive(Clone)]
 pub struct WindowAttributes {
@@ -45,6 +46,16 @@ pub struct Window {
 }
 
 impl Window {
+    // Returns a reasonable default scale for the window based on the platform
+    pub fn default_scale() -> f64 {
+        if cfg!(target_os = "macos") {
+            // Mac window sizes are in logical coordinates so no need to scale
+            1.0
+        } else {
+            screen_scale()
+        }
+    }
+
     pub fn open(
         parent: RawWindowHandle,
         attributes: WindowAttributes,
