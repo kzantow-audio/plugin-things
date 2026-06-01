@@ -14,6 +14,7 @@ cursor-icon.workspace = true
 keyboard-types.workspace = true
 portable-atomic.workspace = true
 raw-window-handle.workspace = true
+tracing.workspace = true
 uuid = { version = "1", features = ["fast-rng", "v4"] }
 
 [target.'cfg(target_os="linux")'.dependencies]

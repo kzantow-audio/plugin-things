@@ -8,10 +8,10 @@ use keyboard_types::Code;
 use portable_atomic::AtomicF64;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle, Win32WindowHandle};
 use uuid::Uuid;
-use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+use windows::Win32::UI::HiDpi::{LogicalToPhysicalPointForPerMonitorDPI, PhysicalToLogicalPointForPerMonitorDPI};
 use windows::Win32::UI::WindowsAndMessaging::{GetParent, WM_CANCELMODE, WM_SETFOCUS, WM_SETCURSOR};
-use windows::{core::PCWSTR, Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_RWIN}};
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::{core::PCWSTR, Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_LWIN, VK_RWIN}};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM, GetLastError};
 use windows::Win32::Graphics::{Dwm::{DwmFlush, DwmIsCompositionEnabled}, Dxgi::{CreateDXGIFactory, IDXGIFactory, IDXGIOutput}, Gdi::{ClientToScreen, MonitorFromWindow, ScreenToClient, HBRUSH, MONITOR_DEFAULTTOPRIMARY}};
 use windows::Win32::System::Ole::{IDropTarget, OleInitialize, RegisterDragDrop, RevokeDragDrop};
 use windows::Win32::UI::{Controls::WM_MOUSELEAVE, Input::KeyboardAndMouse::{GetAsyncKeyState, SetCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_MENU, VK_SHIFT}, WindowsAndMessaging::{CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, LoadCursorW, MoveWindow, RegisterClassW, SendMessageW, SetCursor, SetCursorPos, SetWindowLongPtrW, ShowCursor, UnregisterClassW, CS_OWNDC, GWLP_USERDATA, HICON, IDC_ARROW, WINDOW_EX_STYLE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_RBUTTONDOWN, WM_RBUTTONUP, WNDCLASSW, WS_CHILD, WS_VISIBLE}};
@@ -410,12 +410,24 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
                 let x: i16 = u16::cast_signed(((lparam.0 as usize) & 0xFFFF) as u16);
                 let y: i16 = u16::cast_signed(((lparam.0 as usize) >> 16) as u16);
 
-                let mut position = POINT { x: x as i32, y: y as i32 };
-                let result = unsafe { ScreenToClient(hwnd, &mut position) };
-                assert!(result.as_bool());
+                let scale = window.scale();
+                let mut point = POINT { x: x as _, y: y as _ };
+
+                // ScreenToClient doesn't seem to be DPI-aware
+                if unsafe {
+                    !PhysicalToLogicalPointForPerMonitorDPI(None, &mut point).as_bool()
+                        || !ScreenToClient(window.hwnd(), &mut point).as_bool()
+                        || !LogicalToPhysicalPointForPerMonitorDPI(None, &mut point).as_bool()
+                } {
+                    tracing::warn!("Failed to convert WINAPI mouse wheel position: LastError: {:?}", unsafe { GetLastError() });
+                    return LRESULT(0);
+                }
 
                 window.send_event(Event::MouseWheel {
-                    position: LogicalPosition { x: position.x as f64, y: position.y as f64 },
+                    position: LogicalPosition {
+                        x: point.x as f64 / scale,
+                        y: point.y as f64 / scale,
+                    },
                     delta_x: 0.0,
                     delta_y: wheel_delta as f64 / 120.0,
                 });
