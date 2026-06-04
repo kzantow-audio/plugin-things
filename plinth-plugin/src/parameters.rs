@@ -50,20 +50,28 @@ pub trait Parameters {
         self.typed::<T>(id).unwrap().modulated_plain()
     }
 
-    fn process_event(&self, event: &Event) {
+    fn process_event(&self, event: &Event) -> Result<(), Error> {
         match event {
             Event::ParameterValue { id, value, .. } => {
-                let parameter = self.get(*id).unwrap_or_else(|| panic!("Tried to get parameter with id {id} but it doesn't exist"));
+                let Some(parameter) = self.get(*id) else {
+                    return Err(Error::ParameterIdError(*id));
+                };
+
                 parameter.set_normalized_value(*value).unwrap();
             },
 
             Event::ParameterModulation { id, amount, .. } => {
-                let parameter = self.get(*id).unwrap_or_else(|| panic!("Tried to get parameter with id {id} but it doesn't exist"));
+                let Some(parameter) = self.get(*id) else {
+                    return Err(Error::ParameterIdError(*id));
+                };
+
                 parameter.set_normalized_modulation(*amount);
             },
 
             _ => {},
         }
+
+        Ok(())
     }
 
     fn reset(&self) {

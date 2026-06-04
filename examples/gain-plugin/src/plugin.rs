@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::rc::Rc;
 
 use plinth_plugin::error::Error;
-use plinth_plugin::{export_clap, export_vst3, Event, Host, HostInfo, Parameters, Plugin, ProcessorConfig};
+use plinth_plugin::{Event, Host, HostInfo, Parameters, Plugin, ProcessorConfig, export_clap, export_vst3, tracing};
 use plinth_plugin::clap::ClapPlugin;
 use plinth_plugin::vst3::Vst3Plugin;
 
@@ -38,7 +38,12 @@ impl Plugin for GainPlugin {
     }
 
     fn process_event(&mut self, event: &Event) {
-        self.parameters.process_event(event);
+        match self.parameters.process_event(event) {
+            Ok(_) => {},
+            Err(e) => {
+                tracing::error!("Error processing event: {e:?}");
+            },
+        }
     }
 
     fn create_processor(&self, _config: ProcessorConfig) -> Self::Processor {

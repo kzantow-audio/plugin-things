@@ -1,4 +1,4 @@
-use plinth_plugin::{plinth_core::signals::signal::{Signal, SignalMut}, Event, FloatParameter, Parameters, ProcessState, Processor, Transport};
+use plinth_plugin::{Event, FloatParameter, Parameters, ProcessState, Processor, Transport, plinth_core::signals::signal::{Signal, SignalMut}, tracing};
 
 use crate::parameters::{GainParameter, GainParameters};
 
@@ -30,7 +30,12 @@ impl Processor for GainPluginProcessor {
         events: impl Iterator<Item = Event>
     ) -> ProcessState {
         for event in events {
-            self.parameters.process_event(&event);
+            match self.parameters.process_event(&event) {
+                Ok(_) => {},
+                Err(e) => {
+                    tracing::error!("Error processing event: {e:?}");
+                },
+            }
         }
 
         let gain_db = self.parameters.value::<FloatParameter>(GainParameter::Gain);
@@ -40,14 +45,19 @@ impl Processor for GainPluginProcessor {
             for sample in channel.iter_mut() {
                 *sample *= gain;
             }
-        }        
+        }
 
         ProcessState::Normal
     }
 
     fn process_events(&mut self, events: impl Iterator<Item = Event>) {
         for event in events {
-            self.parameters.process_event(&event);
+            match self.parameters.process_event(&event) {
+                Ok(_) => {},
+                Err(e) => {
+                    tracing::error!("Error processing event: {e:?}");
+                },
+            }
         }
     }
 }
