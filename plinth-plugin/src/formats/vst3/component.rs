@@ -242,7 +242,6 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for PluginComponent<P> {
         tracing::trace!("IAudioProcessor::setupProcessing");
 
         let setup = unsafe { &*setup };
-        assert!(setup.maxSamplesPerBlock > 0);
 
         let processor_config = ProcessorConfig {
             sample_rate: setup.sampleRate,
