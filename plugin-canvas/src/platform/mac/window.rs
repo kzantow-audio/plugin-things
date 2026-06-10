@@ -275,9 +275,7 @@ impl OsWindowInterface for OsWindow {
 impl Drop for OsWindow {
     fn drop(&mut self) {
         if let Some(display_link) = self.display_link.borrow_mut().take() {
-            unsafe {
-                display_link.removeFromRunLoop_forMode(&NSRunLoop::mainRunLoop(), NSDefaultRunLoopMode)
-            };
+            display_link.invalidate();
         }
 
         if let Some(timer) = self.timer.borrow_mut().take() {
