@@ -8,7 +8,6 @@ use keyboard_types::Code;
 use portable_atomic::AtomicF64;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle, Win32WindowHandle};
 use uuid::Uuid;
-use windows::Win32::UI::HiDpi::{LogicalToPhysicalPointForPerMonitorDPI, PhysicalToLogicalPointForPerMonitorDPI};
 use windows::Win32::UI::WindowsAndMessaging::{GetParent, WM_CANCELMODE, WM_SETFOCUS, WM_SETCURSOR};
 use windows::{core::PCWSTR, Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_LWIN, VK_RWIN}};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM, GetLastError};
@@ -413,13 +412,11 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
                 let scale = window.scale();
                 let mut point = POINT { x: x as _, y: y as _ };
 
-                // ScreenToClient doesn't seem to be DPI-aware
-                if unsafe {
-                    !PhysicalToLogicalPointForPerMonitorDPI(None, &mut point).as_bool()
-                        || !ScreenToClient(window.hwnd(), &mut point).as_bool()
-                        || !LogicalToPhysicalPointForPerMonitorDPI(None, &mut point).as_bool()
-                } {
-                    tracing::warn!("Failed to convert WINAPI mouse wheel position: LastError: {:?}", unsafe { GetLastError() });
+                if unsafe { !ScreenToClient(window.hwnd(), &mut point).as_bool() } {
+                    tracing::warn!(
+                        "Failed to convert WINAPI mouse wheel position: LastError: {:?}",
+                        unsafe { GetLastError() }
+                    );
                     return LRESULT(0);
                 }
 
