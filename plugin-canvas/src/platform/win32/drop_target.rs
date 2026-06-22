@@ -5,7 +5,7 @@ use std::os::windows::prelude::OsStringExt;
 use std::ptr::null_mut;
 use std::sync::Weak;
 
-use windows::Win32::Foundation::{POINTL, POINT};
+use windows::Win32::Foundation::{POINTL, POINT, GetLastError};
 use windows::Win32::Graphics::Gdi::ScreenToClient;
 use windows::Win32::System::Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL};
 use windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS;
@@ -97,15 +97,12 @@ impl DropTarget {
         let mut point = POINT { x: (point.x as f64) as _, y: (point.y as f64) as _ };
 
         // ScreenToClient doesn't seem to be DPI-aware
-        if unsafe { !PhysicalToLogicalPointForPerMonitorDPI(None, &mut point).as_bool() } {
-            return None;
-        }
-
-        if unsafe { !ScreenToClient(window.hwnd(), &mut point).as_bool() } {
-            return None;
-        }
-
-        if unsafe { !LogicalToPhysicalPointForPerMonitorDPI(None, &mut point).as_bool() } {
+        if unsafe {
+            !PhysicalToLogicalPointForPerMonitorDPI(None, &mut point).as_bool()
+                || !ScreenToClient(window.hwnd(), &mut point).as_bool()
+                || !LogicalToPhysicalPointForPerMonitorDPI(None, &mut point).as_bool()
+        } {
+            tracing::warn!("Failed to convert WINAPI drag drop position: LastError: {:?}", unsafe { GetLastError() });
             return None;
         }
 
